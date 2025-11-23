@@ -83,17 +83,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const setTyping = (username: string, isTyping: boolean) => {
-    setTypingUsers(prev => ({ ...prev, [username]: isTyping }));
-    if (!isTyping) {
-      // Clear typing indicator after 3 seconds
-      setTimeout(() => {
-        setTypingUsers(prev => {
-          const updated = { ...prev };
-          delete updated[username];
-          return updated;
-        });
-      }, 3000);
-    }
+    setTypingUsers(prev => {
+      const updated = { ...prev };
+      if (isTyping) {
+        updated[username] = true;
+      } else {
+        // Clear typing indicator after 3 seconds
+        setTimeout(() => {
+          setTypingUsers(current => {
+            const next = { ...current };
+            // Only delete if still false (not set to true again)
+            if (next[username] === false || !next[username]) {
+              delete next[username];
+            }
+            return next;
+          });
+        }, 3000);
+        updated[username] = false;
+      }
+      return updated;
+    });
   };
 
   const setOnlineStatus = (username: string, online: boolean) => {
@@ -104,7 +113,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!currentUser) return;
     try {
       const convs = await getConversations();
+      console.log('Refreshed conversations:', convs);
       setConversations(convs);
+      // Update online status from conversations
+      convs.forEach(conv => {
+        if (conv.peerOnline) {
+          setOnlineStatus(conv.peerUsername, true);
+        }
+      });
     } catch (error) {
       console.error('Failed to refresh conversations:', error);
     }
@@ -153,12 +169,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
 
     client.onTyping((event: TypingEvent) => {
+      console.log('Received typing event:', event);
       if (event.from) {
         setTyping(event.from, event.isTyping);
       }
     });
 
     client.onStatus((event: StatusEvent) => {
+      console.log('Received status event:', event);
       setOnlineStatus(event.username, event.online);
       // Update conversations to reflect online status
       getConversations().then(convs => {
