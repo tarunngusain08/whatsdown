@@ -32,8 +32,6 @@ go.work.sum
 # .vscode/
 
 # Build artifacts
-cmd/server/web/
-server
 *.exe
 
 # Frontend
